@@ -7,13 +7,13 @@
  * - JMD0.96D-1 OLED Display (128x64, I2C)
  * 
  * RFID-RC522 Connections:
- * SDA  -> GPIO 21
+ * SDA  -> GPIO 5
  * SCK  -> GPIO 18
  * MOSI -> GPIO 23
  * MISO -> GPIO 19
  * IRQ  -> Not Connected
  * GND  -> GND
- * RST  -> GPIO 22
+ * RST  -> GPIO 4
  * 3.3V -> 3.3V
  * 
  * OLED Display Connections (I2C):
@@ -31,7 +31,7 @@
 
 // RFID pins
 #define SS_PIN 5
-#define RST_PIN 22
+#define RST_PIN 4
 
 // OLED display settings
 #define SCREEN_WIDTH 128

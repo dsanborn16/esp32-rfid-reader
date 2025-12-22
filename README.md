@@ -29,7 +29,7 @@ A simple RFID-based access control system using an ESP32, RFID-RC522 reader, and
 | MISO      | GPIO 19   |
 | IRQ       | NC        |
 | GND       | GND       |
-| RST       | GPIO 22   |
+| RST       | GPIO 4    |
 | 3.3V      | 3.3V      |
 
 ### OLED Display Connections (I2C)

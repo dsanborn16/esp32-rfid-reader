@@ -38,7 +38,7 @@ RC522 Module                ESP32
 │  [ ]  MISO  │────────────── GPIO 19
 │  [ ]  IRQ   │  (Not Connected)
 │  [ ]  GND   │────────────── GND
-│  [ ]  RST   │────────────── GPIO 22
+│  [ ]  RST   │────────────── GPIO 4
 │  [ ]  3.3V  │────────────── 3.3V
 └─────────────┘
 ```
@@ -78,9 +78,14 @@ OLED Display               ESP32
 - Do NOT connect to 5V as it may damage the ESP32
 - Ensure your power supply can provide enough current (~250mA minimum)
 
-### Shared Pins
-- GPIO 22 is shared between RFID RST and OLED SCL (this is intentional and works fine)
-- GPIO 21 is used only for OLED SDA (I2C)
+### Pin Usage
+- GPIO 4: RFID RST
+- GPIO 5: RFID SDA (SPI SS/CS)
+- GPIO 18: RFID SCK (SPI)
+- GPIO 19: RFID MISO (SPI)
+- GPIO 21: OLED SDA (I2C)
+- GPIO 22: OLED SCL (I2C)
+- GPIO 23: RFID MOSI (SPI)
 
 ### Cable Length
 - Keep wires short (< 20cm) for reliable operation
