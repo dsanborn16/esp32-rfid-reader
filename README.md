@@ -51,13 +51,30 @@ Install these libraries through the Arduino IDE Library Manager:
 ## Installation
 
 1. Clone this repository
-2. Open `esp32-rfid-reader.ino` in Arduino IDE
-3. Install the required libraries
-4. Connect your ESP32 to your computer
-5. Select your ESP32 board and port in Tools menu
-6. Upload the sketch
+2. Copy `include/secrets.h.example` to `include/secrets.h`
+3. Edit `include/secrets.h` with your WiFi and MQTT credentials
+4. Open the project in PlatformIO or Arduino IDE
+5. Install the required libraries
+6. Connect your ESP32 to your computer
+7. Select your ESP32 board and port in Tools menu
+8. Upload the sketch
 
 ## Configuration
+
+### WiFi and MQTT Setup
+
+1. Copy `include/secrets.h.example` to `include/secrets.h`
+2. Edit `include/secrets.h` with your credentials:
+
+```cpp
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+const char* mqtt_server = "YOUR_MQTT_SERVER_IP";
+const char* mqtt_username = "YOUR_MQTT_USERNAME";
+const char* mqtt_password = "YOUR_MQTT_PASSWORD";
+```
+
+**Note:** The `secrets.h` file is gitignored and will not be committed to the repository.
 
 ### Adding Authorized Cards
 

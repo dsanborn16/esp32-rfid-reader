@@ -30,16 +30,9 @@
 #include <Adafruit_SSD1306.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include "secrets.h"
 
-// WiFi credentials
-const char* ssid = "LilDon2.4";
-const char* password = "LilyandDon219";
-
-// MQTT settings
-const char* mqtt_server = "10.0.0.155";
-const int mqtt_port = 1883;
-const char* mqtt_username = "esp322";
-const char* mqtt_password = "rfidscanner";
+// MQTT topics
 const char* mqtt_topic = "homeassistant/sensor/rfid_reader/state";
 const char* mqtt_discovery_topic = "homeassistant/sensor/rfid_reader/config";
 
