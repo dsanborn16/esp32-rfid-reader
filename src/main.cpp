@@ -28,6 +28,20 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
+
+// WiFi credentials
+const char* ssid = "LilDon2.4";
+const char* password = "LilyandDon219";
+
+// MQTT settings
+const char* mqtt_server = "10.0.0.155";
+const int mqtt_port = 1883;
+const char* mqtt_username = "esp322";
+const char* mqtt_password = "rfidscanner";
+const char* mqtt_topic = "homeassistant/sensor/rfid_reader/state";
+const char* mqtt_discovery_topic = "homeassistant/sensor/rfid_reader/config";
 
 // RFID pins
 #define SS_PIN 5
@@ -45,13 +59,35 @@ MFRC522 rfid(SS_PIN, RST_PIN);
 // Initialize OLED display
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+// Initialize WiFi and MQTT clients
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+
 // Authorized RFID UIDs (add your card/tag UIDs here)
 String authorizedUIDs[] = {
-  "AA BB CC DD",  // Example UID - replace with your actual card UID
-  "11 22 33 44",  // Add more authorized UIDs as needed
+  "E3 3C 5C 1C",  // Donovan's card
+  "F3 FB 53 94",  // Lily's card
+};
+
+// Names corresponding to each UID
+String authorizedNames[] = {
+  "Donovan",
+  "Lily",
 };
 
 const int numAuthorizedUIDs = sizeof(authorizedUIDs) / sizeof(authorizedUIDs[0]);
+
+// Forward declarations
+String getUID();
+int getAuthorizedIndex(String uid);
+void displayIdleScreen();
+void displayAccessGranted(String name);
+void displayAccessDenied();
+void displayMessage(String title, String message, bool center);
+void connectWiFi();
+void reconnectMQTT();
+void publishDiscoveryConfig();
+void publishRFIDScan(String name, String uid, bool authorized);
 
 void setup() {
   Serial.begin(115200);
@@ -73,6 +109,14 @@ void setup() {
   display.setTextColor(SSD1306_WHITE);
   
   // Display startup message
+  displayMessage("Connecting", "WiFi...", true);
+  
+  // Connect to WiFi
+  connectWiFi();
+  
+  // Setup MQTT
+  mqttClient.setServer(mqtt_server, mqtt_port);
+  
   displayMessage("RFID Reader", "Ready", true);
   
   Serial.println("RFID Reader Ready");
@@ -83,6 +127,12 @@ void setup() {
 }
 
 void loop() {
+  // Maintain MQTT connection
+  if (!mqttClient.connected()) {
+    reconnectMQTT();
+  }
+  mqttClient.loop();
+  
   // Look for new cards
   if (!rfid.PICC_IsNewCardPresent()) {
     return;
@@ -100,11 +150,16 @@ void loop() {
   Serial.println(uidString);
   
   // Check if the card is authorized
-  if (isAuthorized(uidString)) {
-    Serial.println("Access Granted!");
-    displayAccessGranted();
+  int userIndex = getAuthorizedIndex(uidString);
+  if (userIndex >= 0) {
+    String userName = authorizedNames[userIndex];
+    Serial.print("Access Granted! Welcome, ");
+    Serial.println(userName);
+    publishRFIDScan(userName, uidString, true);
+    displayAccessGranted(userName);
   } else {
     Serial.println("Access Denied!");
+    publishRFIDScan("Unknown", uidString, false);
     displayAccessDenied();
   }
   
@@ -130,14 +185,14 @@ String getUID() {
   return content;
 }
 
-// Check if UID is authorized
-bool isAuthorized(String uid) {
+// Get authorized user index, returns -1 if not found
+int getAuthorizedIndex(String uid) {
   for (int i = 0; i < numAuthorizedUIDs; i++) {
     if (uid == authorizedUIDs[i]) {
-      return true;
+      return i;
     }
   }
-  return false;
+  return -1;
 }
 
 // Display idle screen
@@ -151,8 +206,8 @@ void displayIdleScreen() {
   display.display();
 }
 
-// Display access granted message
-void displayAccessGranted() {
+// Display access granted message with name
+void displayAccessGranted(String name) {
   display.clearDisplay();
   
   // Draw checkmark
@@ -161,10 +216,13 @@ void displayAccessGranted() {
   display.fillTriangle(60, 26, 64, 22, 72, 14, SSD1306_BLACK);
   
   display.setTextSize(2);
-  display.setCursor(10, 45);
-  display.println("ACCESS");
-  display.setCursor(8, 45);
-  display.println("GRANTED");
+  
+  // Center the name
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(name, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 45);
+  display.println(name);
   
   display.display();
 }
@@ -216,4 +274,102 @@ void displayMessage(String title, String message, bool center) {
   
   display.println(message);
   display.display();
+}
+
+// Connect to WiFi
+void connectWiFi() {
+  Serial.print("Connecting to WiFi");
+  WiFi.begin(ssid, password);
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi connected");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nWiFi connection failed");
+  }
+}
+
+// Reconnect to MQTT broker
+void reconnectMQTT() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected");
+    return;
+  }
+  
+  if (!mqttClient.connected()) {
+    Serial.print("Connecting to MQTT broker at ");
+    Serial.print(mqtt_server);
+    Serial.print(":");
+    Serial.print(mqtt_port);
+    Serial.print("...");
+    
+    String clientId = "ESP32-RFID-" + String(random(0xffff), HEX);
+    
+    if (mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
+      Serial.println("connected!");
+      // Publish Home Assistant discovery config
+      publishDiscoveryConfig();
+      Serial.println("Published discovery config");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" (trying again in 5s)");
+    }
+  }
+}
+
+// Publish Home Assistant MQTT Discovery configuration
+void publishDiscoveryConfig() {
+  String config = "{";
+  config += "\"name\":\"RFID Reader\",";
+  config += "\"state_topic\":\"homeassistant/sensor/rfid_reader/state\",";
+  config += "\"value_template\":\"{{ value_json.name }}\",";
+  config += "\"json_attributes_topic\":\"homeassistant/sensor/rfid_reader/state\",";
+  config += "\"unique_id\":\"esp32_rfid_reader\",";
+  config += "\"device\":{";
+  config += "\"identifiers\":[\"esp32_rfid\"],";
+  config += "\"name\":\"ESP32 RFID Reader\",";
+  config += "\"manufacturer\":\"ESP32\",";
+  config += "\"model\":\"RFID-RC522\"";
+  config += "}";
+  config += "}";
+  
+  mqttClient.publish(mqtt_discovery_topic, config.c_str(), true);
+}
+
+// Publish RFID scan event to MQTT
+void publishRFIDScan(String name, String uid, bool authorized) {
+  if (!mqttClient.connected()) {
+    Serial.println("MQTT not connected, reconnecting...");
+    reconnectMQTT();
+    return;
+  }
+  
+  // Create JSON payload
+  String payload = "{";
+  payload += "\"name\":\"" + name + "\",";
+  payload += "\"uid\":\"" + uid + "\",";
+  payload += "\"authorized\":" + String(authorized ? "true" : "false") + ",";
+  payload += "\"timestamp\":" + String(millis());
+  payload += "}";
+  
+  Serial.print("Publishing to ");
+  Serial.print(mqtt_topic);
+  Serial.print(": ");
+  Serial.println(payload);
+  
+  // Publish to MQTT
+  if (mqttClient.publish(mqtt_topic, payload.c_str())) {
+    Serial.println("MQTT: Published successfully");
+  } else {
+    Serial.println("MQTT: Publish failed");
+  }
 }

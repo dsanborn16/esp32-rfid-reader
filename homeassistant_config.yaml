@@ -1,0 +1,49 @@
+# Home Assistant MQTT Sensor Configuration
+# Add this to your configuration.yaml file in Home Assistant
+
+mqtt:
+  sensor:
+    - name: "RFID Reader"
+      state_topic: "homeassistant/sensor/rfid_reader/state"
+      value_template: "{{ value_json.name }}"
+      json_attributes_topic: "homeassistant/sensor/rfid_reader/state"
+      unique_id: "esp32_rfid_reader"
+      icon: "mdi:card-account-details"
+
+# Example automation that triggers when a card is scanned
+automation:
+  - alias: "RFID Card Scanned"
+    trigger:
+      - platform: mqtt
+        topic: "homeassistant/sensor/rfid_reader/state"
+    action:
+      - service: notify.notify
+        data:
+          title: "RFID Access"
+          message: "{{ trigger.payload_json.name }} scanned their card"
+    
+  # Specific action when Donovan scans
+  - alias: "Donovan Scanned Card"
+    trigger:
+      - platform: mqtt
+        topic: "homeassistant/sensor/rfid_reader/state"
+    condition:
+      - condition: template
+        value_template: "{{ trigger.payload_json.name == 'Donovan' }}"
+    action:
+      - service: light.turn_on  # Example: turn on lights
+        target:
+          entity_id: light.your_light_name
+      
+  # Specific action when Lily scans
+  - alias: "Lily Scanned Card"
+    trigger:
+      - platform: mqtt
+        topic: "homeassistant/sensor/rfid_reader/state"
+    condition:
+      - condition: template
+        value_template: "{{ trigger.payload_json.name == 'Lily' }}"
+    action:
+      - service: light.turn_on  # Example: turn on lights
+        target:
+          entity_id: light.your_light_name
